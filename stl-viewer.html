@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>STL Viewer</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #1a1a1e;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #eee;
+  }
+  #viewer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; }
+
+  #dropzone {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center;
+    z-index: 5;
+    transition: background 0.15s ease;
+  }
+  #dropzone.dragover { background: rgba(90, 140, 255, 0.08); }
+  #dropzone h1 { font-size: 20px; font-weight: 600; margin: 0 0 8px; }
+  #dropzone p { font-size: 14px; color: #999; margin: 0 0 20px; }
+  #dropzone.hidden { display: none; }
+
+  #fileBtn {
+    background: #3a6ff7; color: white; border: none;
+    padding: 10px 20px; border-radius: 8px; font-size: 14px;
+    cursor: pointer; font-weight: 500;
+  }
+  #fileBtn:hover { background: #2f5fe0; }
+  #fileInput { display: none; }
+
+  #topbar {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px;
+    z-index: 4;
+    pointer-events: none;
+  }
+  #topbar > * { pointer-events: auto; }
+  #filename {
+    font-size: 13px; color: #ccc; background: rgba(0,0,0,0.4);
+    padding: 6px 12px; border-radius: 6px; max-width: 50vw;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    display: none;
+  }
+  #controls {
+    display: flex; gap: 8px;
+  }
+  #controls button {
+    background: rgba(255,255,255,0.08); color: #eee; border: 1px solid rgba(255,255,255,0.12);
+    padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer;
+  }
+  #controls button:hover { background: rgba(255,255,255,0.15); }
+
+  #hint {
+    position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+    font-size: 12px; color: #777; z-index: 4; display: none;
+    background: rgba(0,0,0,0.35); padding: 5px 12px; border-radius: 12px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  #loading {
+    position: absolute; inset: 0; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.5); z-index: 10; font-size: 14px; color: #ccc;
+  }
+
+  #error {
+    position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
+    background: #7a2020; color: #fff; padding: 10px 16px; border-radius: 8px;
+    font-size: 13px; display: none; z-index: 10; max-width: 80vw;
+  }
+</style>
+</head>
+<body>
+
+<div id="viewer"></div>
+
+<div id="dropzone">
+  <h1>STL Viewer</h1>
+  <p>Drop an .stl file here, or click below to browse</p>
+  <button id="fileBtn">Choose STL File</button>
+  <input type="file" id="fileInput" accept=".stl">
+</div>
+
+<div id="topbar">
+  <div id="filename"></div>
+  <div id="controls" style="display:none;">
+    <button id="resetViewBtn">Reset View</button>
+    <button id="wireframeBtn">Wireframe</button>
+    <button id="loadNewBtn">Load New</button>
+  </div>
+</div>
+
+<div id="hint">Left-drag: rotate &middot; Right-drag: pan &middot; Scroll: zoom</div>
+<div id="loading">Loading model&hellip;</div>
+<div id="error"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+(function () {
+  const viewerEl = document.getElementById('viewer');
+  const dropzone = document.getElementById('dropzone');
+  const fileBtn = document.getElementById('fileBtn');
+  const fileInput = document.getElementById('fileInput');
+  const filenameEl = document.getElementById('filename');
+  const controlsBar = document.getElementById('controls');
+  const resetViewBtn = document.getElementById('resetViewBtn');
+  const wireframeBtn = document.getElementById('wireframeBtn');
+  const loadNewBtn = document.getElementById('loadNewBtn');
+  const hint = document.getElementById('hint');
+  const loadingEl = document.getElementById('loading');
+  const errorEl = document.getElementById('error');
+
+  let scene, camera, renderer, mesh, gridHelper;
+  let wireframeOn = false;
+  let defaultState = null;
+
+  // ---------- Minimal orbit/pan/zoom camera controller (mouse + touch) ----------
+  const target = new THREE.Vector3(0, 0, 0);
+  let radius = 10, theta = Math.PI / 4, phi = Math.PI / 3; // spherical around target
+  const minPhi = 0.001, maxPhi = Math.PI - 0.001;
+
+  function updateCameraFromSpherical() {
+    phi = Math.max(minPhi, Math.min(maxPhi, phi));
+    const sinPhiRadius = Math.sin(phi) * radius;
+    camera.position.x = target.x + sinPhiRadius * Math.sin(theta);
+    camera.position.y = target.y + Math.cos(phi) * radius;
+    camera.position.z = target.z + sinPhiRadius * Math.cos(theta);
+    camera.lookAt(target);
+  }
+
+  function setupControls(domEl) {
+    let rotating = false, panning = false;
+    let lastX = 0, lastY = 0;
+    let pinchDist = 0;
+    let touchMode = null; // 'rotate' | 'pan' | 'pinch'
+    let lastTouchMidpoint = null;
+
+    domEl.addEventListener('contextmenu', e => e.preventDefault());
+
+    domEl.addEventListener('mousedown', (e) => {
+      if (e.button === 0) rotating = true;
+      else if (e.button === 2) panning = true;
+      lastX = e.clientX; lastY = e.clientY;
+    });
+    window.addEventListener('mouseup', () => { rotating = false; panning = false; });
+    window.addEventListener('mousemove', (e) => {
+      const dx = e.clientX - lastX, dy = e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY;
+      if (rotating) {
+        theta -= dx * 0.008;
+        phi -= dy * 0.008;
+        updateCameraFromSpherical();
+      } else if (panning) {
+        doPan(dx, dy);
+      }
+    });
+    domEl.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const scale = Math.pow(0.95, -e.deltaY * 0.02);
+      radius = Math.max(radius * (e.deltaY > 0 ? 1.08 : 0.92), 0.001);
+      updateCameraFromSpherical();
+    }, { passive: false });
+
+    function doPan(dx, dy) {
+      const panSpeed = radius * 0.0015;
+      const camRight = new THREE.Vector3();
+      camera.getWorldDirection(new THREE.Vector3());
+      camRight.setFromMatrixColumn(camera.matrix, 0);
+      const camUp = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+      const offset = new THREE.Vector3()
+        .addScaledVector(camRight, -dx * panSpeed)
+        .addScaledVector(camUp, dy * panSpeed);
+      target.add(offset);
+      updateCameraFromSpherical();
+    }
+
+    // Touch support
+    domEl.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        touchMode = 'rotate';
+        lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+      } else if (e.touches.length === 2) {
+        touchMode = 'pinch';
+        const t0 = e.touches[0], t1 = e.touches[1];
+        pinchDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+        lastTouchMidpoint = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
+      }
+    }, { passive: true });
+
+    domEl.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (touchMode === 'rotate' && e.touches.length === 1) {
+        const dx = e.touches[0].clientX - lastX;
+        const dy = e.touches[0].clientY - lastY;
+        lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+        theta -= dx * 0.008;
+        phi -= dy * 0.008;
+        updateCameraFromSpherical();
+      } else if (touchMode === 'pinch' && e.touches.length === 2) {
+        const t0 = e.touches[0], t1 = e.touches[1];
+        const newDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+        const delta = newDist - pinchDist;
+        pinchDist = newDist;
+        radius = Math.max(radius * (1 - delta * 0.003), 0.001);
+
+        const mid = { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
+        if (lastTouchMidpoint) {
+          doPan(mid.x - lastTouchMidpoint.x, mid.y - lastTouchMidpoint.y);
+        }
+        lastTouchMidpoint = mid;
+        updateCameraFromSpherical();
+      }
+    }, { passive: false });
+
+    domEl.addEventListener('touchend', (e) => {
+      if (e.touches.length === 0) { touchMode = null; lastTouchMidpoint = null; }
+      else if (e.touches.length === 1) {
+        touchMode = 'rotate';
+        lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+      }
+    });
+  }
+
+  // ---------- Minimal STL parser (binary + ASCII) ----------
+  function isBinarySTL(buffer) {
+    const reader = new DataView(buffer);
+    if (buffer.byteLength < 84) return true;
+    const faceCount = reader.getUint32(80, true);
+    const expectedBinarySize = 84 + faceCount * 50;
+    if (expectedBinarySize === buffer.byteLength) return true;
+
+    // Check if it starts with "solid" as ASCII text
+    const headerBytes = new Uint8Array(buffer, 0, Math.min(5, buffer.byteLength));
+    const headerStr = String.fromCharCode.apply(null, headerBytes);
+    if (headerStr.toLowerCase() !== 'solid') return true;
+    return false;
+  }
+
+  function parseBinarySTL(buffer) {
+    const reader = new DataView(buffer);
+    const faceCount = reader.getUint32(80, true);
+    const positions = new Float32Array(faceCount * 9);
+    const normals = new Float32Array(faceCount * 9);
+    let offset = 84;
+    for (let f = 0; f < faceCount; f++) {
+      const nx = reader.getFloat32(offset, true);
+      const ny = reader.getFloat32(offset + 4, true);
+      const nz = reader.getFloat32(offset + 8, true);
+      offset += 12;
+      for (let v = 0; v < 3; v++) {
+        const vi = f * 9 + v * 3;
+        positions[vi] = reader.getFloat32(offset, true);
+        positions[vi + 1] = reader.getFloat32(offset + 4, true);
+        positions[vi + 2] = reader.getFloat32(offset + 8, true);
+        normals[vi] = nx; normals[vi + 1] = ny; normals[vi + 2] = nz;
+        offset += 12;
+      }
+      offset += 2; // attribute byte count
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+    return geometry;
+  }
+
+  function parseAsciiSTL(buffer) {
+    const text = new TextDecoder().decode(buffer);
+    const positions = [];
+    const normals = [];
+    const vertexRe = /vertex\s+([\-\d.eE+]+)\s+([\-\d.eE+]+)\s+([\-\d.eE+]+)/g;
+    const normalRe = /facet\s+normal\s+([\-\d.eE+]+)\s+([\-\d.eE+]+)\s+([\-\d.eE+]+)/g;
+    const facets = text.split('facet').slice(1);
+    for (const facet of facets) {
+      normalRe.lastIndex = 0;
+      const nm = normalRe.exec('facet' + facet);
+      let nx = 0, ny = 0, nz = 0;
+      if (nm) { nx = parseFloat(nm[1]); ny = parseFloat(nm[2]); nz = parseFloat(nm[3]); }
+      vertexRe.lastIndex = 0;
+      let vm;
+      let count = 0;
+      while ((vm = vertexRe.exec(facet)) !== null && count < 3) {
+        positions.push(parseFloat(vm[1]), parseFloat(vm[2]), parseFloat(vm[3]));
+        normals.push(nx, ny, nz);
+        count++;
+      }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(normals), 3));
+    return geometry;
+  }
+
+  function parseSTL(buffer) {
+    return isBinarySTL(buffer) ? parseBinarySTL(buffer) : parseAsciiSTL(buffer);
+  }
+
+  // ---------- Three.js scene setup ----------
+  function initThree() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a1e);
+
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 10000);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    viewerEl.appendChild(renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const dir1 = new THREE.DirectionalLight(0xffffff, 0.7);
+    dir1.position.set(1, 1, 1);
+    scene.add(dir1);
+    const dir2 = new THREE.DirectionalLight(0xffffff, 0.4);
+    dir2.position.set(-1, -0.5, -1);
+    scene.add(dir2);
+
+    updateCameraFromSpherical();
+    setupControls(renderer.domElement);
+
+    window.addEventListener('resize', onResize);
+    animate();
+  }
+
+  function onResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+  }
+
+  function clearScene() {
+    if (mesh) {
+      scene.remove(mesh);
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+      mesh = null;
+    }
+    if (gridHelper) {
+      scene.remove(gridHelper);
+      gridHelper = null;
+    }
+  }
+
+  function showError(msg) {
+    errorEl.textContent = msg;
+    errorEl.style.display = 'block';
+    setTimeout(() => { errorEl.style.display = 'none'; }, 4500);
+  }
+
+  function loadSTL(arrayBuffer, name) {
+    loadingEl.style.display = 'flex';
+    setTimeout(() => {
+      try {
+        const geometry = parseSTL(arrayBuffer);
+        if (!geometry.attributes.position || geometry.attributes.position.count === 0) {
+          throw new Error('No triangle data found in file');
+        }
+        geometry.computeVertexNormals();
+        geometry.center();
+
+        const material = new THREE.MeshStandardMaterial({
+          color: 0x9fb8ff,
+          metalness: 0.15,
+          roughness: 0.6,
+          side: THREE.DoubleSide
+        });
+
+        clearScene();
+        mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        geometry.computeBoundingBox();
+        const box = geometry.boundingBox;
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        const maxDim = Math.max(size.x, size.y, size.z) || 1;
+        const distance = maxDim * 2.2;
+
+        camera.near = maxDim / 100;
+        camera.far = maxDim * 100;
+        camera.updateProjectionMatrix();
+
+        target.set(0, 0, 0);
+        radius = distance;
+        theta = Math.PI / 4;
+        phi = Math.PI / 3;
+        updateCameraFromSpherical();
+
+        defaultState = { radius, theta, phi, target: target.clone() };
+
+        const gridSize = maxDim * 3;
+        gridHelper = new THREE.GridHelper(gridSize, 20, 0x444455, 0x2a2a30);
+        gridHelper.position.y = box.min.y;
+        scene.add(gridHelper);
+
+        filenameEl.textContent = name;
+        filenameEl.style.display = 'block';
+        controlsBar.style.display = 'flex';
+        hint.style.display = 'block';
+        dropzone.classList.add('hidden');
+      } catch (err) {
+        showError('Could not parse this file as STL: ' + err.message);
+      } finally {
+        loadingEl.style.display = 'none';
+      }
+    }, 30);
+  }
+
+  function handleFile(file) {
+    if (!file) return;
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith('.stl')) {
+      showError('Please choose a .stl file.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => loadSTL(e.target.result, file.name);
+    reader.onerror = () => showError('Failed to read the file.');
+    reader.readAsArrayBuffer(file);
+  }
+
+  fileBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+  loadNewBtn.addEventListener('click', () => {
+    dropzone.classList.remove('hidden');
+  });
+
+  ['dragenter', 'dragover'].forEach(evt => {
+    window.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('hidden');
+      dropzone.classList.add('dragover');
+    });
+  });
+  ['dragleave', 'drop'].forEach(evt => {
+    window.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+    });
+  });
+  window.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files && e.dataTransfer.files[0];
+    handleFile(file);
+  });
+
+  resetViewBtn.addEventListener('click', () => {
+    if (!defaultState) return;
+    radius = defaultState.radius;
+    theta = defaultState.theta;
+    phi = defaultState.phi;
+    target.copy(defaultState.target);
+    updateCameraFromSpherical();
+  });
+
+  wireframeBtn.addEventListener('click', () => {
+    if (!mesh) return;
+    wireframeOn = !wireframeOn;
+    mesh.material.wireframe = wireframeOn;
+    wireframeBtn.textContent = wireframeOn ? 'Solid' : 'Wireframe';
+  });
+
+  initThree();
+})();
+</script>
+
+</body>
+</html>
