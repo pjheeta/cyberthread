@@ -1,0 +1,404 @@
+<meta charset="utf-8">
+<title>NORDLJUS — Fibre Build & Coupler Guide</title>
+<style>
+  :root{
+    --ink:#0a0a0a;
+    --mid:#c9c9c9;
+    --soft:#eee;
+    --paper:#fff;
+    --glow:#ff2d95;        /* the ONLY colour in this document: emitted light */
+    --glow-dim:#ffc4e2;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .sheet{max-width:880px;margin:0 auto;padding:56px 40px 90px}
+
+  /* masthead */
+  .mast{border-bottom:3px solid var(--ink);padding-bottom:22px}
+  .brandrow{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+  h1{font-size:56px;line-height:.9;margin:0;font-weight:800;letter-spacing:-.045em;text-transform:uppercase}
+  .sub{font-size:13px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;margin-top:10px}
+  .meta{font-size:12px;text-align:right;line-height:1.7;letter-spacing:.04em;text-transform:uppercase;font-weight:700}
+  .meta span{display:block;font-weight:400;text-transform:none;letter-spacing:0;color:#666}
+  .lede{font-size:15px;color:#333;max-width:64ch;margin:20px 0 0}
+
+  h2{font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:800;
+    margin:56px 0 18px;padding-bottom:8px;border-bottom:2px solid var(--ink)}
+  h3{font-size:15px;font-weight:800;margin:26px 0 8px;letter-spacing:-.01em}
+  p{margin:0 0 12px;max-width:64ch}
+  b{font-weight:700}
+  em{font-style:italic}
+
+  /* the changed-note band */
+  .band{background:var(--soft);padding:16px 20px;margin:22px 0 0;font-size:13.5px;max-width:none}
+  .band b{display:inline}
+
+  /* parts */
+  .parts{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));
+    border-left:1px solid var(--mid);border-top:1px solid var(--mid)}
+  .part{border-right:1px solid var(--mid);border-bottom:1px solid var(--mid);padding:14px 10px;text-align:center}
+  .part svg{display:block;margin:0 auto 7px}
+  .pn{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;line-height:1.3}
+  .pq{font-size:11px;font-weight:800;margin-top:3px}
+  .pnote{font-size:9.5px;color:#777;margin-top:2px;line-height:1.3}
+  .have{background:var(--soft)}
+  .key{font-size:11px;color:#666;margin-top:12px}
+  .key .sw{display:inline-block;width:12px;height:12px;background:var(--soft);border:1px solid var(--mid);vertical-align:-2px;margin-right:5px}
+
+  /* architecture strip */
+  .arch{margin:8px 0 0}
+
+  /* HERO coupler */
+  .hero{border:2.5px solid var(--ink);margin:16px 0 8px;padding:28px 26px 22px;position:relative}
+  .hero .figwrap{text-align:center;margin:0 0 6px}
+  .herocap{font-size:12px;text-align:center;color:#555;letter-spacing:.04em;text-transform:uppercase;font-weight:700;margin-top:4px}
+
+  /* right/wrong row */
+  .rw{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:22px 0 0}
+  .rw .cell{text-align:center}
+  .rw .cell svg{display:block;margin:0 auto 8px}
+  .rw .verdict{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+  .rw .yes .verdict{color:var(--glow)}
+  .rw .desc{font-size:11px;color:#666;margin-top:3px;line-height:1.35}
+
+  /* steps */
+  .step{display:grid;grid-template-columns:46px 1fr;gap:18px;padding:26px 0;border-bottom:1px solid var(--mid);page-break-inside:avoid}
+  .num{width:36px;height:36px;border:2.5px solid var(--ink);border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
+  .cap{font-size:13.5px;max-width:62ch}
+  .tag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+    border:1.5px solid var(--ink);padding:2px 7px;margin-bottom:9px}
+  .crit{background:var(--ink);color:#fff}
+  code{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12.5px;background:var(--soft);padding:1px 5px;font-weight:600}
+  .fig{margin:2px 0 12px}
+
+  /* cost */
+  .cost{width:100%;border-collapse:collapse;font-size:13px}
+  .cost td{border-bottom:1px solid var(--mid);padding:8px 10px}
+  .cost td:last-child{text-align:right}
+  .cost tr.own td{color:#8a8a8a}
+  .cost .why{display:block;font-size:11px;color:#999;margin-top:1px}
+  .cost tr.tot td{font-weight:800;border-top:2px solid var(--ink);border-bottom:none;padding-top:11px}
+  .strike{text-decoration:line-through;color:#bbb}
+
+  .foot{margin-top:56px;padding-top:20px;border-top:3px solid var(--ink);font-size:12.5px;color:#555}
+
+  @media print{.sheet{padding:0}body{font-size:12px}h1{font-size:42px}.step{padding:18px 0}}
+  @media (max-width:640px){
+    .sheet{padding:30px 16px 60px}h1{font-size:36px}
+    .rw{grid-template-columns:1fr 1fr}.step{grid-template-columns:38px 1fr;gap:12px}
+  }
+</style>
+
+<div class="sheet">
+
+  <div class="mast">
+    <div class="brandrow">
+      <div><h1>Nordljus</h1><div class="sub">Fibre-optic hair system · SK9822 light engine</div></div>
+      <div class="meta">Build &amp; Coupler Guide<span>ESP32 · SK9822 · 8 fibre</span><span>Design no. BRC-26 · rev C</span></div>
+    </div>
+    <p class="lede">Eight LEDs live in a box on your chest. Eight fibres carry their light up into your braids. Nothing electronic goes in your hair — only glowing plastic. The whole build is parts you already own, plus fibre. The one thing you fabricate, and the one thing that decides whether this looks brilliant or dim, is the <b>coupler</b> — so this guide is built around it.</p>
+  </div>
+
+  <div class="band">
+    <b>What changed from the strip idea:</b> the SK9822 strip is no longer worn in your hair — it goes <em>in the box</em> as the light source. Fibre replaces it in the hair because fibre drapes and a strip does not. Same part you know from the bike wheel; new job.
+  </div>
+
+  <!-- PARTS -->
+  <h2>Parts</h2>
+  <div class="parts">
+    <div class="part have">
+      <svg width="54" height="42" viewBox="0 0 54 42"><g fill="none" stroke="#000" stroke-width="2">
+        <rect x="11" y="6" width="32" height="30" fill="#eee"/><rect x="15" y="9" width="9" height="8" fill="#fff"/>
+        <path d="M11 13H6M11 19H6M11 25H6M11 31H6M43 13h5M43 19h5M43 25h5M43 31h5"/><rect x="26" y="22" width="11" height="9" fill="#fff"/>
+      </g></svg>
+      <div class="pn">ESP32-WROOM-32</div><div class="pq">×1</div><div class="pnote">you own this</div></div>
+
+    <div class="part have">
+      <svg width="54" height="42" viewBox="0 0 54 42"><g fill="none" stroke="#000" stroke-width="2">
+        <rect x="4" y="15" width="46" height="12" fill="#eee"/>
+        <rect x="8" y="18" width="6" height="6" fill="var(--glow)" stroke="none"/><rect x="19" y="18" width="6" height="6" fill="var(--glow)" stroke="none"/>
+        <rect x="30" y="18" width="6" height="6" fill="var(--glow)" stroke="none"/><rect x="41" y="18" width="6" height="6" fill="var(--glow)" stroke="none"/>
+        <path d="M4 21H1M50 21h3"/></g></svg>
+      <div class="pn">SK9822 strip</div><div class="pq">8 px</div><div class="pnote">from bike-wheel stock</div></div>
+
+    <div class="part">
+      <svg width="54" height="42" viewBox="0 0 54 42"><g fill="none" stroke="#000" stroke-width="1.8">
+        <path d="M8 36c5-9 4-19 9-27M16 36c5-9 4-19 9-27M24 36c5-9 4-19 9-27M32 36c5-9 4-19 9-27M40 36c5-9 4-19 9-27"/></g></svg>
+      <div class="pn">Side-glow fibre</div><div class="pq">10 m</div><div class="pnote">2 mm PMMA · not end-glow</div></div>
+
+    <div class="part">
+      <svg width="54" height="42" viewBox="0 0 54 42"><g fill="none" stroke="#000" stroke-width="2">
+        <rect x="10" y="12" width="34" height="20" rx="2" fill="#eee"/>
+        <circle cx="20" cy="22" r="4" fill="#fff"/><circle cx="20" cy="22" r="1.4" fill="#000" stroke="none"/>
+        <path d="M31 17h9M31 22h9M31 27h9" stroke-width="1.4"/></g></svg>
+      <div class="pn">INMP441 mic</div><div class="pq">×1</div><div class="pnote">glitch mode · optional</div></div>
+
+    <div class="part">
+      <svg width="54" height="42" viewBox="0 0 54 42"><g fill="none" stroke="#000" stroke-width="2">
+        <rect x="9" y="14" width="36" height="16" rx="2" fill="#eee"/>
+        <circle cx="16" cy="22" r="2.4" fill="#fff"/><circle cx="23" cy="22" r="2.4" fill="#fff"/><circle cx="30" cy="22" r="2.4" fill="#fff"/><circle cx="38" cy="22" r="2.4" fill="#fff"/>
+        <path d="M9 14l-4-3M45 14l4-3"/></g></svg>
+      <div class="pn">Coupling block</div><div class="pq">×1</div><div class="pnote">you make this</div></div>
+
+    <div class="part">
+      <svg width="54" height="42" viewBox="0 0 54 42"><g fill="none" stroke="#000" stroke-width="2">
+        <path d="M9 12h36v22H9z" fill="#eee"/><path d="M9 12l6-5h36l-6 5M45 34l6-5V7"/></g></svg>
+      <div class="pn">Project box</div><div class="pq">×1</div><div class="pnote">plastic — never metal</div></div>
+
+    <div class="part have">
+      <svg width="54" height="42" viewBox="0 0 54 42"><g fill="none" stroke="#000" stroke-width="2">
+        <rect x="10" y="6" width="34" height="30" rx="4" fill="#eee"/><rect x="23" y="9" width="8" height="4" rx="1" fill="#fff"/>
+        <path d="M17 20h20M17 26h13" stroke-width="2.5"/></g></svg>
+      <div class="pn">Power bank</div><div class="pq">×1</div><div class="pnote">~1A draw · runs all night</div></div>
+
+    <div class="part">
+      <svg width="54" height="42" viewBox="0 0 54 42"><g fill="none" stroke="#000" stroke-width="2">
+        <rect x="6" y="15" width="16" height="12" rx="2" fill="#eee"/><rect x="32" y="15" width="16" height="12" rx="2" fill="#eee"/>
+        <path d="M22 19h3M22 23h3M29 19h3M29 23h3"/></g></svg>
+      <div class="pn">Mag breakaway</div><div class="pq">×1</div><div class="pnote">safety disconnect</div></div>
+
+    <div class="part have">
+      <svg width="54" height="42" viewBox="0 0 54 42"><g fill="none" stroke="#000" stroke-width="2">
+        <path d="M6 21c5-8 9 8 14 0s9 8 14 0 9 8 14 0"/><path d="M6 28c5-8 9 8 14 0s9 8 14 0 9 8 14 0" stroke-width="1.3"/></g></svg>
+      <div class="pn">Paracord + heatshrink</div><div class="pq">kit</div><div class="pnote">chain core &amp; jacket</div></div>
+
+    <div class="part">
+      <svg width="54" height="42" viewBox="0 0 54 42"><g fill="none" stroke="#000" stroke-width="2">
+        <rect x="16" y="20" width="22" height="6" fill="#eee"/><path d="M16 23H8M46 23h-8"/>
+        <path d="M22 20l3-8 4 16 4-8h5" stroke-width="1.6"/></g></svg>
+      <div class="pn">Reflective tape</div><div class="pq">scrap</div><div class="pnote">wraps the coupler</div></div>
+  </div>
+  <div class="key"><span class="sw"></span>Grey = already in your drawer</div>
+
+  <!-- ARCHITECTURE -->
+  <h2>How it fits together</h2>
+  <div class="arch">
+    <svg width="100%" viewBox="0 0 840 150" role="img" aria-label="Signal and light path from ESP32 through the SK9822 pixels and coupler into the fibre and hair">
+      <defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+      <!-- box -->
+      <rect x="8" y="24" width="470" height="102" rx="12" fill="none" stroke="#000" stroke-width="1" stroke-dasharray="5 5"/>
+      <text x="20" y="42" font-size="11" font-weight="700" font-family="Helvetica">IN THE BOX (on your chest)</text>
+      <!-- esp -->
+      <rect x="26" y="58" width="120" height="46" rx="7" fill="#eee" stroke="#000" stroke-width="1.5"/>
+      <text x="86" y="80" font-size="13" font-weight="800" text-anchor="middle" font-family="Helvetica">ESP32</text>
+      <text x="86" y="95" font-size="9.5" text-anchor="middle" fill="#444" font-family="Helvetica">WLED or FastLED</text>
+      <line x1="146" y1="81" x2="176" y2="81" stroke="#000" stroke-width="1.5" marker-end="url(#a)"/>
+      <text x="161" y="74" font-size="8.5" text-anchor="middle" font-weight="700" font-family="Helvetica">DAT+CLK</text>
+      <!-- pixels -->
+      <rect x="178" y="58" width="132" height="46" rx="7" fill="#eee" stroke="#000" stroke-width="1.5"/>
+      <g fill="var(--glow)"><rect x="190" y="74" width="8" height="14"/><rect x="204" y="74" width="8" height="14"/><rect x="218" y="74" width="8" height="14"/><rect x="232" y="74" width="8" height="14"/><rect x="246" y="74" width="8" height="14"/><rect x="260" y="74" width="8" height="14"/><rect x="274" y="74" width="8" height="14"/><rect x="288" y="74" width="8" height="14"/></g>
+      <text x="244" y="70" font-size="9.5" text-anchor="middle" font-weight="700" font-family="Helvetica">8× SK9822</text>
+      <line x1="310" y1="81" x2="340" y2="81" stroke="#000" stroke-width="1.5" marker-end="url(#a)"/>
+      <!-- coupler -->
+      <rect x="342" y="58" width="120" height="46" rx="7" fill="none" stroke="#000" stroke-width="2"/>
+      <text x="402" y="80" font-size="13" font-weight="800" text-anchor="middle" font-family="Helvetica">COUPLER</text>
+      <text x="402" y="95" font-size="9.5" text-anchor="middle" fill="#444" font-family="Helvetica">the one hard part</text>
+      <!-- to fibre -->
+      <line x1="478" y1="81" x2="512" y2="81" stroke="var(--glow)" stroke-width="3" marker-end="url(#a)"/>
+      <!-- fibre chain -->
+      <rect x="514" y="58" width="120" height="46" rx="7" fill="#eee" stroke="#000" stroke-width="1.5"/>
+      <text x="574" y="80" font-size="12" font-weight="800" text-anchor="middle" font-family="Helvetica">Fibre chain</text>
+      <text x="574" y="95" font-size="9.5" text-anchor="middle" fill="#444" font-family="Helvetica">+ mag breakaway</text>
+      <line x1="634" y1="81" x2="668" y2="81" stroke="var(--glow)" stroke-width="3" marker-end="url(#a)"/>
+      <!-- hair -->
+      <rect x="670" y="58" width="120" height="46" rx="7" fill="#eee" stroke="#000" stroke-width="1.5"/>
+      <text x="730" y="80" font-size="12" font-weight="800" text-anchor="middle" font-family="Helvetica">Fibre in hair</text>
+      <text x="730" y="95" font-size="9.5" text-anchor="middle" fill="#444" font-family="Helvetica">passive · drapes</text>
+      <text x="8" y="140" font-size="10.5" fill="#666" font-family="Helvetica">Magenta = emitted light. Everything before the coupler is electronics; everything after is passive plastic.</text>
+    </svg>
+  </div>
+
+  <!-- ============ THE COUPLER ============ -->
+  <h2>The coupler — in detail</h2>
+  <p>A fibre makes no light of its own. It is a pipe: light shone into its end travels the length and (side-glow fibre) leaks out along the way, so the strand glows. The coupler is the junction where an SK9822 pixel's face meets a fibre's end. <b>Get this right and the piece is bright and controllable. Get it wrong and no amount of good code or good fibre recovers it.</b> Everything below is that junction, magnified.</p>
+
+  <div class="hero">
+    <div class="figwrap">
+      <svg width="100%" viewBox="0 0 620 340" role="img" aria-label="Cross-section of one coupler: SK9822 pixel on the strip, coupling block with a stepped bore, polished fibre bottomed against the pixel lens, retaining glue behind the block, reflective wrap around the junction, and light travelling up the fibre">
+        <!-- fibre going up, glowing -->
+        <rect x="286" y="12" width="30" height="150" fill="none" stroke="#000" stroke-width="2"/>
+        <rect x="292" y="12" width="18" height="150" fill="var(--glow)" opacity="0.16"/>
+        <line x1="301" y1="150" x2="301" y2="20" stroke="var(--glow)" stroke-width="2.5"/>
+        <path d="M301 30l-5 8M301 50l6 8M301 74l-5 8M301 98l6 8M301 122l-5 8" stroke="var(--glow-dim)" stroke-width="1.4" fill="none"/>
+        <text x="330" y="40" font-size="12" font-weight="700" font-family="Helvetica">Side-glow fibre</text>
+        <text x="330" y="55" font-size="10.5" fill="#555" font-family="Helvetica">light leaks out along the</text>
+        <text x="330" y="69" font-size="10.5" fill="#555" font-family="Helvetica">length → the strand glows</text>
+        <!-- up arrow -->
+        <line x1="255" y1="150" x2="255" y2="40" stroke="var(--glow)" stroke-width="1.5" marker-end="url(#au)"/>
+        <defs><marker id="au" viewBox="0 0 10 10" refX="5" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 8L5 1L9 8" fill="none" stroke="var(--glow)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+        <text x="210" y="100" font-size="10.5" font-weight="700" fill="var(--glow)" font-family="Helvetica" text-anchor="middle" transform="rotate(-90 210 100)">LIGHT TRAVELS UP</text>
+
+        <!-- retaining glue behind the block -->
+        <path d="M286 150c-8 4-12 4-12 4M316 150c8 4 12 4 12 4" stroke="#000" stroke-width="1" fill="none"/>
+        <ellipse cx="278" cy="158" rx="9" ry="5" fill="#eee" stroke="#000" stroke-width="1.2"/>
+        <ellipse cx="324" cy="158" rx="9" ry="5" fill="#eee" stroke="#000" stroke-width="1.2"/>
+        <text x="410" y="150" font-size="12" font-weight="700" font-family="Helvetica">Retaining glue</text>
+        <text x="410" y="165" font-size="10.5" fill="#555" font-family="Helvetica">on the fibre shaft,</text>
+        <text x="410" y="179" font-size="10.5" fill="#555" font-family="Helvetica"><tspan font-weight="700">behind</tspan> the junction —</text>
+        <text x="410" y="193" font-size="10.5" fill="#555" font-family="Helvetica">never in the light gap</text>
+        <line x1="333" y1="158" x2="405" y2="156" stroke="#000" stroke-width="0.6" stroke-dasharray="2 2"/>
+
+        <!-- the block -->
+        <path d="M180 168h242v70H180z" fill="#f4f4f4" stroke="#000" stroke-width="2"/>
+        <!-- bore with step -->
+        <path d="M286 168v46h-4v-46M316 168v46h4v-46" fill="none" stroke="#000" stroke-width="1.4"/>
+        <path d="M282 214h8" stroke="#000" stroke-width="1.4"/>
+        <!-- fibre inside bore -->
+        <rect x="288" y="168" width="26" height="52" fill="var(--glow)" opacity="0.12"/>
+        <line x1="301" y1="168" x2="301" y2="218" stroke="var(--glow)" stroke-width="2.5"/>
+        <!-- polished end sitting on the step -->
+        <path d="M289 218h24" stroke="#000" stroke-width="2"/>
+        <text x="150" y="205" font-size="12" font-weight="700" text-anchor="end" font-family="Helvetica">Coupling block</text>
+        <text x="150" y="220" font-size="10.5" fill="#555" text-anchor="end" font-family="Helvetica">rigid · opaque · one</text>
+        <text x="150" y="234" font-size="10.5" fill="#555" text-anchor="end" font-family="Helvetica">bore per pixel</text>
+        <line x1="180" y1="200" x2="155" y2="200" stroke="#000" stroke-width="0.6" stroke-dasharray="2 2"/>
+        <!-- step callout -->
+        <text x="455" y="214" font-size="11.5" font-weight="700" font-family="Helvetica">Shelf / step</text>
+        <text x="455" y="228" font-size="10.5" fill="#555" font-family="Helvetica">stops the fibre before</text>
+        <text x="455" y="242" font-size="10.5" fill="#555" font-family="Helvetica">it crushes the pixel</text>
+        <line x1="322" y1="216" x2="450" y2="216" stroke="#000" stroke-width="0.6" stroke-dasharray="2 2"/>
+
+        <!-- reflective wrap -->
+        <path d="M176 164h250v78H176z" fill="none" stroke="var(--glow)" stroke-width="1.4" stroke-dasharray="4 3" opacity="0.6"/>
+        <text x="410" y="112" font-size="12" font-weight="700" font-family="Helvetica">Reflective wrap</text>
+        <text x="410" y="127" font-size="10.5" fill="#555" font-family="Helvetica">bounces stray light back</text>
+        <line x1="425" y1="180" x2="470" y2="120" stroke="#000" stroke-width="0.6" stroke-dasharray="2 2"/>
+
+        <!-- gap zone highlight -->
+        <circle cx="301" cy="226" r="15" fill="none" stroke="#000" stroke-width="1" stroke-dasharray="2 2"/>
+
+        <!-- the pixel -->
+        <rect x="272" y="238" width="58" height="26" rx="2" fill="#eee" stroke="#000" stroke-width="2"/>
+        <rect x="290" y="234" width="22" height="6" rx="2" fill="var(--glow)" stroke="#000" stroke-width="1"/>
+        <text x="301" y="256" font-size="9.5" text-anchor="middle" font-weight="700" font-family="Helvetica">SK9822</text>
+        <!-- strip pcb -->
+        <rect x="150" y="264" width="320" height="18" fill="#f4f4f4" stroke="#000" stroke-width="2"/>
+        <path d="M160 273h300" stroke="#000" stroke-width="0.5" stroke-dasharray="3 3"/>
+        <text x="150" y="304" font-size="12" font-weight="700" font-family="Helvetica" text-anchor="start">SK9822 strip — the light engine, bolted inside the box</text>
+        <text x="480" y="252" font-size="11.5" font-weight="700" font-family="Helvetica">Emitting face</text>
+        <text x="480" y="266" font-size="10.5" fill="#555" font-family="Helvetica">fibre bottoms out here,</text>
+        <text x="480" y="280" font-size="10.5" fill="#555" font-family="Helvetica"><tspan font-weight="700" fill="#000">touching &amp; dry</tspan></text>
+        <line x1="312" y1="237" x2="478" y2="250" stroke="#000" stroke-width="0.6" stroke-dasharray="2 2"/>
+      </svg>
+    </div>
+    <div class="herocap">One coupler, in cross-section — repeated eight times across the block</div>
+  </div>
+
+  <h3>The insight that makes it buildable: the block pitch <em>is</em> the strip pitch</h3>
+  <p>You are not aligning eight fibres to eight LEDs by eye. The SK9822 strip already spaces its pixels at a fixed, repeating distance — its <b>pixel pitch</b>. Drill your block's holes at <em>that exact spacing</em> and every bore lands over a pixel automatically. Measure yours center-to-center: a 30 LED/m strip is about <code>33 mm</code> pitch, so eight pixels span roughly <code>233 mm</code>. That makes the block a long, slim bar — design the enclosure around a bar, not a cube. (If you want a compact block instead, cut the strip into single pixels and rejoin them with short <code>DAT/CLK/5V/GND</code> jumpers at a tighter pitch — more soldering, smaller part. Keeping the strip intact is the low-effort path.)</p>
+
+  <h3>The four things that must be true at every bore</h3>
+
+  <div class="rw">
+    <div class="cell yes">
+      <svg width="70" height="70" viewBox="0 0 70 70" fill="none" stroke="#000" stroke-width="2">
+        <rect x="30" y="8" width="10" height="34"/><path d="M30 42h10" stroke-width="2.4"/>
+        <rect x="22" y="46" width="26" height="9" fill="#eee"/><rect x="30" y="42" width="10" height="4" fill="var(--glow)" stroke="none"/>
+        <line x1="35" y1="8" x2="35" y2="40" stroke="var(--glow)" stroke-width="2.4"/>
+      </svg>
+      <div class="verdict">Do this</div>
+      <div class="desc">Polished flat end, bottomed out, touching the lens, dry.</div>
+    </div>
+    <div class="cell">
+      <svg width="70" height="70" viewBox="0 0 70 70" fill="none" stroke="#000" stroke-width="2">
+        <rect x="30" y="8" width="10" height="26"/><path d="M30 34h10" stroke-width="2.4"/>
+        <rect x="22" y="46" width="26" height="9" fill="#eee"/><rect x="30" y="42" width="10" height="4" fill="var(--glow)" stroke="none"/>
+        <path d="M27 40l4-3M35 41v-3M43 40l-4-3" stroke="var(--glow-dim)" stroke-width="1.4"/>
+      </svg>
+      <div class="verdict">Not this</div>
+      <div class="desc">Air gap. Light spreads and misses the core — dim strand.</div>
+    </div>
+    <div class="cell">
+      <svg width="70" height="70" viewBox="0 0 70 70" fill="none" stroke="#000" stroke-width="2">
+        <rect x="30" y="8" width="10" height="34"/><path d="M30 42c2-3 4 2 5-1s3 2 5 0" stroke-width="1.6"/>
+        <rect x="22" y="46" width="26" height="9" fill="#eee"/><rect x="30" y="42" width="10" height="4" fill="var(--glow)" stroke="none"/>
+        <path d="M26 30l6 6M44 30l-6 6" stroke="var(--glow-dim)" stroke-width="1.4"/>
+      </svg>
+      <div class="verdict">Not this</div>
+      <div class="desc">Crushed/scissor-cut end. Scatters light back out.</div>
+    </div>
+    <div class="cell">
+      <svg width="70" height="70" viewBox="0 0 70 70" fill="none" stroke="#000" stroke-width="2">
+        <rect x="30" y="8" width="10" height="30"/>
+        <ellipse cx="35" cy="41" rx="8" ry="4" fill="#ccc"/>
+        <rect x="22" y="46" width="26" height="9" fill="#eee"/><rect x="30" y="42" width="10" height="4" fill="#bbb" stroke="none"/>
+      </svg>
+      <div class="verdict">Not this</div>
+      <div class="desc">Glue in the gap. Fogs the lens, permanently dims it.</div>
+    </div>
+  </div>
+
+  <h3>Coupler assembly, bore by bore</h3>
+  <p><b>1 · Prep the fibre end.</b> Cut each fibre with a <em>fresh razor against a hard surface</em> — never scissors, which crush the core. Sand the end flat on fine paper, then pass it briefly through a flame until it goes glassy. This polished face is the single biggest brightness lever in the build.</p>
+  <p><b>2 · Bottom it out, dry.</b> Press the polished end into its bore until it stops on the shelf, resting against the pixel's emitting face. There must be <em>nothing</em> between fibre and lens — no glue, no air you can help. Plastic touching plastic.</p>
+  <p><b>3 · Retain from behind.</b> Put a small bead of adhesive on the fibre shaft <em>where it exits the back of the block</em>, never at the tip. The block sets the aim and distance; the glue only stops the fibre backing out.</p>
+  <p><b>4 · Wrap the junction.</b> Sleeve the whole block-to-strip zone in reflective tape or white heatshrink. Stray light that would escape sideways gets bounced back into the fibres — free brightness, and it stops light leaking between neighbouring channels and muddying your per-strand colour.</p>
+  <p><b>5 · Keep it re-seatable.</b> During bench test you <em>will</em> find a dull strand. A dry friction-fit lets you pull that one fibre, re-polish, and re-seat in thirty seconds. A fibre glued to the lens cannot be fixed. This is why steps 2 and 3 keep the optical face dry.</p>
+
+  <!-- ============ FULL BUILD ============ -->
+  <h2>Full build sequence</h2>
+
+  <div class="step"><div class="num">1</div><div>
+    <span class="tag crit">Test the idea before you build it</span>
+    <p class="cap">Before any box or block: wire <b>one</b> SK9822 pixel to the ESP32, press <b>one</b> polished fibre against it in a dark room, and look. This is the fifteen-minute test that tells you whether glowing fibre reads the way you're picturing. Fibre always looks dim in daylight and great in the dark — judge it where you'll wear it. If it's too dim even in the dark, fix the polish or the contact <em>now</em>, not after you've built eight of them.</p>
+  </div></div>
+
+  <div class="step"><div class="num">2</div><div>
+    <p class="cap">Cut an <b>8-pixel run</b> from the SK9822 strip. Solder four wires to its <b>input</b> end — <code>5V</code>, <code>GND</code>, <code>DAT</code>, <code>CLK</code>. SK9822 is directional: the strip has arrows, and data flows one way. Solder to the end the arrows point <em>away</em> from, or nothing lights.</p>
+  </div></div>
+
+  <div class="step"><div class="num">3</div><div>
+    <p class="cap">Wire the strip to the ESP32 over hardware SPI — the same DotStar setup you used on the bike wheel. In FastLED: <code>FastLED.addLeds&lt;SK9822, DATA_PIN, CLOCK_PIN, BGR&gt;(leds, 8);</code>. Because SK9822 carries its own clock, it shrugs off the jostling a wearable takes — no timing glitches when you move.</p>
+  </div></div>
+
+  <div class="step"><div class="num">4</div><div>
+    <span class="tag">The one part you fabricate</span>
+    <p class="cap">Drill the <b>coupling block</b> at your strip's pixel pitch, one bore per pixel, each sized for a snug fibre press-fit with a shelf at the bottom so the fibre bottoms out against the lens without crushing it. Black/opaque material — a 3D print, Delrin, or black acrylic. See <b>The coupler</b> above; this is the step that decides everything.</p>
+  </div></div>
+
+  <div class="step"><div class="num">5</div><div>
+    <p class="cap">Couple all eight fibres — prep, bottom out dry, retain from behind, wrap. Cut fibres long and polish <em>after</em> seating so any insertion damage sands away. Mount the block over the strip so each bore sits centred on its pixel.</p>
+  </div></div>
+
+  <div class="step"><div class="num">6</div><div>
+    <span class="tag">Optional — glitch mode</span>
+    <p class="cap">Add the <b>INMP441</b> mic if you want sound reactivity: <code>VDD→3V3</code> (not 5V), <code>L/R→GND</code>, and the I²S trio to free GPIOs. On WLED, the AudioReactive usermod drives it for you. Mount the port facing out of the box toward the music.</p>
+  </div></div>
+
+  <div class="step"><div class="num">7</div><div>
+    <span class="tag crit">Before you close anything</span>
+    <p class="cap">Power it on the bench, run every mode, and confirm <b>all eight strands light and match</b>. A dull one is a coupling — pull, re-polish, re-seat. Do this while everything is open and a fix costs a minute. Then run it on battery at full brightness for an hour and watch for heat and for how long the power bank actually lasts.</p>
+  </div></div>
+
+  <div class="step"><div class="num">8</div><div>
+    <p class="cap">Build the <b>chain</b>: bundle the eight fibres with a <b>550 paracord core</b> and sleeve the lot in black heatshrink. The <em>paracord</em> is anchored at both ends and carries all the weight; the fibres float loose inside carrying none — loaded fibre creeps and dims over a week. Fit the <b>magnetic breakaway</b> so a snag pops apart instead of pulling your head.</p>
+  </div></div>
+
+  <div class="step"><div class="num">9</div><div>
+    <p class="cap">Braid the eight fibres into tight tracks against the scalp so surrounding hair hides the strands and only the glow shows. Strain-relieve where the chain enters the box <em>and</em> where it meets the braid — both are flex points that fatigue over the week.</p>
+  </div></div>
+
+  <!-- COST -->
+  <h2>Cost</h2>
+  <table class="cost">
+    <tr class="own"><td>ESP32-WROOM-32<span class="why">in your drawer</span></td><td class="strike">$7</td><td>$0</td></tr>
+    <tr class="own"><td>SK9822 pixels<span class="why">8 cut from bike-wheel stock</span></td><td class="strike">$0</td><td>$0</td></tr>
+    <tr class="own"><td>Paracord, heatshrink, wire, power bank, reflective tape<span class="why">existing kits</span></td><td class="strike">$40</td><td>$0</td></tr>
+    <tr><td>Side-glow fibre, 10 m<span class="why">buy long — you'll ruin ends learning to polish</span></td><td>$18</td><td>$18</td></tr>
+    <tr><td>Project box (plastic, bar-shaped)</td><td>$9</td><td>$9</td></tr>
+    <tr><td>Magnetic breakaway</td><td>$9</td><td>$9</td></tr>
+    <tr><td>Coupling block stock<span class="why">free if you print it</span></td><td>$8</td><td>$0–8</td></tr>
+    <tr><td>INMP441 mic<span class="why">optional — enables glitch mode</span></td><td>$6</td><td>$6</td></tr>
+    <tr><td>Conformal coat<span class="why">recommended — dust kills uncoated joints by mid-week</span></td><td>$14</td><td>$14</td></tr>
+    <tr class="tot"><td>Realistic out-of-pocket</td><td>$56</td><td>≈ $47</td></tr>
+  </table>
+
+  <div class="foot">
+    If a strand goes dark, it is the coupler — not the code. Pull that fibre, re-polish the end, re-seat it dry against the pixel. It is the coupler roughly every time. Everything electronic you already own or already understand; the craft in this build lives entirely at that junction.
+  </div>
+
+</div>
