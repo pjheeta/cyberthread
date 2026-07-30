@@ -1,0 +1,39 @@
+Path A — WLED: you flash, you don't write. WLED is C++/Arduino firmware, so "no issues with Arduino" makes it fully available to you — but you barely touch code. You flash the binary, open its web UI, tell it "SK9822, 8 pixels, these pins," enable the AudioReactive usermod for your INMP441, and you're done. The entire architecture I walked through — two-core split, mode table, web layer, mic subsystem, NVS persistence — you inherit, pre-built and battle-tested. Your work becomes configuration, not programming.
+
+
+how would I control it on the palya
+
+Good — WLED it is, and "how do I control it on the playa" is exactly the right question to poke at, because the playa breaks the assumptions WLED's control model is normally built on. Let me walk through how control actually works, then the three things about the playa specifically that you have to design around.
+
+How WLED control works, normally
+
+WLED serves its own web interface. You connect a phone to it and control it from a browser or the WLED app — brightness, color, effect, speed, on/off, presets. There's no cloud, no account, nothing phones home. That "no internet needed" part is what makes it viable out there at all.
+
+But there's a catch in the default setup: out of the box, WLED wants to join your home WiFi, and you control it as another device on that network. There is no home WiFi on the playa. So the default model doesn't apply, and this is the thing to get right before you go.
+
+The mode that actually works out there: AP mode
+
+WLED has a built-in access point — the ESP32 broadcasts its own WiFi network. Your phone connects directly to the wearable itself; no router, no infrastructure. This is the playa answer.
+
+How it behaves: when WLED boots and can't find a known network (which is always, out there), it falls back to broadcasting an AP — typically named WLED-AP. You connect your phone to that network, and WLED's control page opens automatically (a captive portal, like a hotel WiFi splash). From there you have the full interface.
+
+To make this reliable, before you leave you'd set WLED to AP mode always-on (not just as a fallback) in its WiFi settings, so it isn't wasting time scanning for home networks that aren't there. You give the AP a name and a password so it's yours and not open to every passerby.
+
+So the on-playa flow is: wearable powers on → broadcasts its AP → you open your phone's WiFi, tap your network, the control page appears → change color/effect/brightness/mode. That's it. Works in the deep playa with zero infrastructure.
+
+Now the three playa-specific problems, because the above is the easy version:
+
+1. Your phone fights you over the "no internet" network. This is the one that'll actually bite you. When your phone connects to an AP with no internet — which WLED's AP is — modern phones detect "no internet here" and often auto-disconnect, or pop "this network has no internet, stay connected?" every time, or silently drop back to cellular. On the playa, where you'll connect and reconnect a lot, this is genuinely annoying. Mitigations: tell your phone to stay connected to this network / disable "auto-switch to mobile data" for it, and on Android turn off "switch to mobile network if no internet." Set this up and test it at home before you go, because fighting your phone's captive-portal logic at 2 a.m. in the dust is miserable.
+
+2. RF soup. The playa is thousands of people, hotspots, LED-suit controllers, everyone's phone. 2.4 GHz gets crowded. AP mode helps because you're the only client on your own network, but connection can still be flaky in a dense crowd. Practical answer: you don't need a persistent connection. You connect, change the look, disconnect. WLED keeps running the selected mode with no phone attached. So treat control as "occasional adjustment," not "live tether."
+
+3. You often can't reach your phone, or don't want to. Half the time you're dancing, riding, hands full, phone buried. So lean on WLED features that mean you don't need the phone most of the night:
+
+Presets + playlists. Save your favorite looks as presets, then build a playlist that auto-cycles through them on a timer. Set it once; it runs all night untouched. This is the big one for a wearable — you may barely touch the phone after setup.
+Macros / on-boot preset. WLED can boot straight into a chosen preset, so it comes up right every time you swap the battery.
+The mic mode is autonomous. AudioReactive glitch mode needs no phone at all — it just reacts to the music around you. Set it and forget it.
+The honest recommendation for playa control: set up AP mode always-on, build 3–5 presets (your purple, your glitch, a slow breathing fade, etc.) and a playlist that cycles them, and set a boot preset. Then the phone becomes optional — you pull it out only when you want to deliberately override the look, connect, tap, disconnect. That's far more robust than expecting a live connection to hold in that environment.
+
+One thing worth knowing exists, though I'd not rely on it: WLED supports physical controls too — a button on a GPIO can cycle presets or toggle power. For a wearable where the phone is a hassle to reach, a single concealed button at your chest box that advances through your presets is a really nice touch. No phone at all: press to change look. If you want that, it's one more GPIO and a config line, and it might be the most playa-appropriate control of all — because it works with dusty hands, no screen, no reconnecting.
+
+Want me to lay out the specific WLED settings to configure before you leave — the AP setup, the preset/playlist structure, the boot preset, and optionally that hardware button — as a pre-departure checklist you can run through at home while you still have a calm network to test on?
