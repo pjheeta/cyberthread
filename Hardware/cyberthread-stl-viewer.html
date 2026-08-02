@@ -1,0 +1,294 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>CYBERTHREAD · STL viewer</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root{
+    --bg:#0d0f14; --panel:#151a22; --panel2:#1c2230; --line:#2a3240;
+    --txt:#e7ecf3; --dim:#8a94a6; --accent:#ff2d95; --accent2:#36c6ff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
+    font-family:"SF Mono",Menlo,Consolas,ui-monospace,monospace}
+  #app{position:fixed;inset:0}
+  canvas{display:block;touch-action:none}
+
+  /* top bar */
+  .bar{position:absolute;top:0;left:0;right:0;height:52px;display:flex;align-items:center;
+    gap:14px;padding:0 16px;background:linear-gradient(180deg,rgba(13,15,20,.92),rgba(13,15,20,0));
+    z-index:10;pointer-events:none}
+  .brand{font-weight:700;letter-spacing:.06em;font-size:13px;pointer-events:auto}
+  .brand .dot{color:var(--accent)}
+  .brand small{color:var(--dim);font-weight:400;letter-spacing:.12em;margin-left:8px}
+  .spacer{flex:1}
+  .btn{pointer-events:auto;background:var(--panel2);color:var(--txt);border:1px solid var(--line);
+    border-radius:7px;padding:7px 11px;font:inherit;font-size:11.5px;cursor:pointer;
+    letter-spacing:.03em;transition:.12s;white-space:nowrap}
+  .btn:hover{border-color:var(--accent);color:#fff}
+  .btn.on{border-color:var(--accent);color:var(--accent)}
+
+  /* info panel */
+  .info{position:absolute;left:16px;bottom:16px;z-index:10;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:210px;
+    font-size:11.5px;line-height:1.9;backdrop-filter:blur(8px)}
+  .info h3{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);
+    margin-bottom:8px;font-weight:700}
+  .row{display:flex;justify-content:space-between;gap:20px}
+  .row .k{color:var(--dim)}
+  .row .v{color:var(--txt);font-variant-numeric:tabular-nums}
+  .dimv{color:var(--accent2)}
+
+  /* controls hint */
+  .hint{position:absolute;right:16px;bottom:16px;z-index:10;color:var(--dim);
+    font-size:10.5px;line-height:1.8;text-align:right;background:rgba(21,26,34,.6);
+    padding:10px 12px;border-radius:8px;border:1px solid var(--line)}
+  .hint b{color:var(--txt)}
+
+  /* drop / empty state */
+  .drop{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:16px;background:rgba(13,15,20,.86);text-align:center;transition:.15s}
+  .drop.hide{opacity:0;pointer-events:none}
+  .drop .ring{width:88px;height:88px;border:2px dashed var(--line);border-radius:20px;
+    display:flex;align-items:center;justify-content:center}
+  .drop .ring svg{width:38px;height:38px;stroke:var(--accent)}
+  .drop h2{font-size:15px;font-weight:700;letter-spacing:.03em}
+  .drop p{color:var(--dim);font-size:12px;max-width:340px;line-height:1.6}
+  .drop.drag{background:rgba(255,45,149,.08)}
+  .drop.drag .ring{border-color:var(--accent);border-style:solid}
+
+  .err{color:#ff6b6b;font-size:11.5px;margin-top:6px;min-height:14px}
+  @media(max-width:560px){.hint{display:none}.info{min-width:0}}
+</style>
+
+<div id="app">
+  <div class="bar">
+    <div class="brand">CYBERTHREAD<span class="dot">·</span>STL viewer<small>PRO</small></div>
+    <div class="spacer"></div>
+    <button class="btn" id="open">Open STL</button>
+    <button class="btn" id="wire">Wireframe</button>
+    <button class="btn" id="grid">Grid</button>
+    <button class="btn" id="bbox">Bounds</button>
+    <button class="btn" id="spin">Spin</button>
+    <button class="btn" id="bg">Light</button>
+    <button class="btn" id="reset">Reset view</button>
+  </div>
+
+  <div class="info" id="info" style="display:none">
+    <h3>Model</h3>
+    <div class="row"><span class="k">file</span><span class="v" id="i-file">—</span></div>
+    <div class="row"><span class="k">triangles</span><span class="v" id="i-tri">—</span></div>
+    <div class="row"><span class="k">size X</span><span class="v dimv" id="i-x">—</span></div>
+    <div class="row"><span class="k">size Y</span><span class="v dimv" id="i-y">—</span></div>
+    <div class="row"><span class="k">size Z</span><span class="v dimv" id="i-z">—</span></div>
+    <div class="row"><span class="k">longest</span><span class="v" id="i-max">—</span></div>
+  </div>
+
+  <div class="hint">
+    <div><b>drag</b> orbit &nbsp; <b>scroll</b> zoom</div>
+    <div><b>right-drag</b> / <b>shift-drag</b> pan</div>
+  </div>
+
+  <div class="drop" id="drop">
+    <div class="ring">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg>
+    </div>
+    <h2>Drop an STL file here</h2>
+    <p>Or click <b>Open STL</b>. Handles both ASCII and binary STL, including the 80-byte-header binaries that trip up naive parsers. Units are read as millimetres.</p>
+    <div class="err" id="err"></div>
+  </div>
+
+  <input type="file" id="file" accept=".stl" style="display:none">
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const app=$('app');
+
+  // ---------- three basics ----------
+  const scene=new THREE.Scene();
+  const bgDark=0x0d0f14, bgLight=0xe9edf2;
+  scene.background=new THREE.Color(bgDark);
+  const camera=new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 100000);
+  const renderer=new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth,innerHeight);
+  app.appendChild(renderer.domElement);
+
+  const hemi=new THREE.HemisphereLight(0xffffff,0x33383f,0.9); scene.add(hemi);
+  const key=new THREE.DirectionalLight(0xffffff,0.85); key.position.set(1,1.4,1); scene.add(key);
+  const fill=new THREE.DirectionalLight(0xff2d95,0.18); fill.position.set(-1,-.4,-1); scene.add(fill);
+
+  const grid=new THREE.GridHelper(100,20,0x33404f,0x222a34); grid.visible=false; scene.add(grid);
+  const axes=new THREE.AxesHelper(20); axes.visible=false; scene.add(axes);
+
+  let mesh=null, boxHelper=null, wire=false, spin=false, light=false;
+  const target=new THREE.Vector3(0,0,0);
+
+  const mat=new THREE.MeshStandardMaterial({
+    color:0x8f9bb3, metalness:0.15, roughness:0.55, flatShading:false,
+    side:THREE.DoubleSide });
+  const wmat=new THREE.MeshBasicMaterial({color:0xff2d95, wireframe:true});
+
+  // ---------- orbit / pan / zoom ----------
+  let radius=120, theta=0.9, phi=1.05; // spherical around target
+  const st={drag:false,pan:false,px:0,py:0};
+  function applyCam(){
+    const s=Math.sin(phi), x=radius*s*Math.cos(theta), y=radius*Math.cos(phi), z=radius*s*Math.sin(theta);
+    camera.position.set(target.x+x, target.y+y, target.z+z);
+    camera.lookAt(target);
+  }
+  const el=renderer.domElement;
+  el.addEventListener('pointerdown',e=>{
+    el.setPointerCapture(e.pointerId);
+    if(e.button===2||e.shiftKey){st.pan=true;} else {st.drag=true;}
+    st.px=e.clientX; st.py=e.clientY;
+  });
+  el.addEventListener('contextmenu',e=>e.preventDefault());
+  el.addEventListener('pointermove',e=>{
+    const dx=e.clientX-st.px, dy=e.clientY-st.py; st.px=e.clientX; st.py=e.clientY;
+    if(st.drag){ theta-=dx*0.008; phi=Math.max(0.05,Math.min(Math.PI-0.05,phi-dy*0.008)); applyCam(); }
+    else if(st.pan){
+      const panScale=radius*0.0016;
+      const right=new THREE.Vector3(), up=new THREE.Vector3(0,1,0), fwd=new THREE.Vector3();
+      camera.getWorldDirection(fwd); right.crossVectors(fwd,up).normalize();
+      const trueUp=new THREE.Vector3().crossVectors(right,fwd).normalize();
+      target.addScaledVector(right,-dx*panScale);
+      target.addScaledVector(trueUp, dy*panScale);
+      applyCam();
+    }
+  });
+  el.addEventListener('pointerup',e=>{st.drag=st.pan=false;});
+  el.addEventListener('wheel',e=>{
+    e.preventDefault();
+    radius*=(1+Math.sign(e.deltaY)*0.09);
+    radius=Math.max(1,Math.min(50000,radius)); applyCam();
+  },{passive:false});
+
+  // ---------- STL parsing (ASCII + binary, robust header) ----------
+  function parseSTL(buffer){
+    const dv=new DataView(buffer);
+    // binary test: 80 header + 4 count + n*50 == length
+    if(buffer.byteLength>=84){
+      const n=dv.getUint32(80,true);
+      if(84 + n*50 === buffer.byteLength) return parseBinary(dv,n);
+    }
+    // else treat as ASCII
+    const txt=new TextDecoder().decode(buffer);
+    if(txt.trim().slice(0,5).toLowerCase()==='solid' && /facet/i.test(txt)) return parseAscii(txt);
+    // last resort: if it *looked* binary-ish, try binary anyway
+    if(buffer.byteLength>=84){ const n=dv.getUint32(80,true); if(n>0 && n<5e6) return parseBinary(dv,n); }
+    throw new Error('Could not parse this file as STL — no triangle data found.');
+  }
+  function parseBinary(dv,n){
+    const pos=new Float32Array(n*9), nor=new Float32Array(n*9);
+    let o=84;
+    for(let i=0;i<n;i++){
+      const nx=dv.getFloat32(o,true),ny=dv.getFloat32(o+4,true),nz=dv.getFloat32(o+8,true); o+=12;
+      for(let v=0;v<3;v++){
+        const b=i*9+v*3;
+        pos[b]=dv.getFloat32(o,true); pos[b+1]=dv.getFloat32(o+4,true); pos[b+2]=dv.getFloat32(o+8,true); o+=12;
+        nor[b]=nx; nor[b+1]=ny; nor[b+2]=nz;
+      }
+      o+=2; // attr byte count
+    }
+    return build(pos,nor,n);
+  }
+  function parseAscii(txt){
+    const verts=[]; const re=/vertex\s+([-\d.eE+]+)\s+([-\d.eE+]+)\s+([-\d.eE+]+)/g; let m;
+    while((m=re.exec(txt))!==null){ verts.push(+m[1],+m[2],+m[3]); }
+    const n=verts.length/9;
+    if(n<1||!Number.isInteger(n)) throw new Error('Could not parse this file as STL — no triangle data found.');
+    return build(new Float32Array(verts),null,n);
+  }
+  function build(pos,nor,n){
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    if(nor) g.setAttribute('normal',new THREE.BufferAttribute(nor,3));
+    else g.computeVertexNormals();
+    g.computeBoundingBox();
+    return {geometry:g, tris:n};
+  }
+
+  // ---------- load ----------
+  function loadBuffer(buffer,name){
+    let res;
+    try{ res=parseSTL(buffer); }
+    catch(err){ $('err').textContent=err.message; return; }
+    if(mesh){ scene.remove(mesh); mesh.geometry.dispose(); }
+    if(boxHelper){ scene.remove(boxHelper); boxHelper=null; }
+
+    const g=res.geometry;
+    // center at origin
+    const bb=g.boundingBox, size=new THREE.Vector3(), ctr=new THREE.Vector3();
+    bb.getSize(size); bb.getCenter(ctr);
+    g.translate(-ctr.x,-ctr.y,-ctr.z);
+    g.computeBoundingBox();
+
+    mesh=new THREE.Mesh(g, wire?wmat:mat); scene.add(mesh);
+
+    // box helper
+    boxHelper=new THREE.Box3Helper(new THREE.Box3().setFromObject(mesh), 0x36c6ff);
+    boxHelper.visible=$('bbox').classList.contains('on'); scene.add(boxHelper);
+
+    // fit camera
+    target.set(0,0,0);
+    const maxDim=Math.max(size.x,size.y,size.z)||10;
+    radius=maxDim/(2*Math.tan(camera.fov*Math.PI/360))*1.6;
+    theta=0.9; phi=1.05; applyCam();
+
+    // grid to model floor
+    scene.remove(grid);
+    const gsz=Math.ceil(maxDim*1.6/10)*10;
+    const ng=new THREE.GridHelper(gsz, Math.max(10,Math.round(gsz/10)),0x33404f,0x222a34);
+    ng.position.y=-size.y/2; ng.visible=$('grid').classList.contains('on');
+    scene.add(ng); window._grid=ng;
+
+    // info
+    $('info').style.display='block';
+    $('i-file').textContent = name.length>18?name.slice(0,16)+'…':name;
+    $('i-tri').textContent = res.tris.toLocaleString();
+    $('i-x').textContent = size.x.toFixed(1)+' mm';
+    $('i-y').textContent = size.y.toFixed(1)+' mm';
+    $('i-z').textContent = size.z.toFixed(1)+' mm';
+    $('i-max').textContent = maxDim.toFixed(1)+' mm';
+    $('drop').classList.add('hide'); $('err').textContent='';
+  }
+  function loadFile(f){
+    if(!f) return;
+    if(!/\.stl$/i.test(f.name)){ $('err').textContent='That is not a .stl file.'; return; }
+    const r=new FileReader();
+    r.onload=()=>loadBuffer(r.result,f.name);
+    r.onerror=()=>$('err').textContent='Could not read that file.';
+    r.readAsArrayBuffer(f);
+  }
+
+  // ---------- UI ----------
+  $('open').onclick=()=>$('file').click();
+  $('file').onchange=e=>loadFile(e.target.files[0]);
+  $('wire').onclick=e=>{ wire=!wire; e.target.classList.toggle('on',wire); if(mesh) mesh.material=wire?wmat:mat; };
+  $('grid').onclick=e=>{ const on=e.target.classList.toggle('on'); if(window._grid) window._grid.visible=on; };
+  $('bbox').onclick=e=>{ const on=e.target.classList.toggle('on'); if(boxHelper) boxHelper.visible=on; };
+  $('spin').onclick=e=>{ spin=!spin; e.target.classList.toggle('on',spin); };
+  $('bg').onclick=e=>{ light=!light; e.target.classList.toggle('on',light);
+    scene.background=new THREE.Color(light?bgLight:bgDark); e.target.textContent=light?'Dark':'Light';
+    mat.color.set(light?0x5b6474:0x8f9bb3); };
+  $('reset').onclick=()=>{ if(mesh){ target.set(0,0,0);
+    const s=new THREE.Vector3(); mesh.geometry.boundingBox.getSize(s);
+    const md=Math.max(s.x,s.y,s.z)||10; radius=md/(2*Math.tan(camera.fov*Math.PI/360))*1.6;
+    theta=0.9; phi=1.05; applyCam(); } };
+
+  // drag & drop
+  const drop=$('drop');
+  ['dragenter','dragover'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('hide');drop.classList.add('drag');}));
+  ['dragleave','drop'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag'); if(ev==='dragleave'&&mesh) drop.classList.add('hide');}));
+  document.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; loadFile(f); });
+
+  addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+
+  applyCam();
+  (function loop(){ requestAnimationFrame(loop); if(spin&&mesh){ theta+=0.004; applyCam(); } renderer.render(scene,camera); })();
+})();
+</script>
